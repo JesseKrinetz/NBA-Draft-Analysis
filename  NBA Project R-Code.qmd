@@ -1,0 +1,402 @@
+---
+title: "Final Project Data Science"
+author: "Jesse Krinetz"
+format: docx
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+## Importing the Data Set
+
+```{r}
+
+bball_data <- read.csv("/Users/jessekrinetz/Desktop/Data Science Notes/draft-data-20-years.csv")
+
+
+
+
+```
+
+## Choosing Specific Draft Classes
+
+```{r}
+bball_data_specific <- bball_data %>% 
+  filter(DraftYr >= 1990 & DraftYr <= 2012) %>% # I only want to see players with at least 10+ years being able to play in the NBA. Does not mean they have to
+  filter(Pk >= 1 & Pk <= 30) # Only looking at 1st Round Picks
+
+```
+
+I am not going to put a minimum or maximum amount of years played on what I will be looking at because part of seeing what draft class is better is the longevity. My only requirement is that they have to be able to play at least 10 years in the NBA. Does not mean that they did. It just has to mean they could have. That is why it stops at 2012 because the data sets ends at the 2021-2022 NBA season.
+
+PICK 29 FORFEITED IN 2001 AND 2002 (Salary Cap Violations by the Timberwolves)
+
+## Averages for Each Draft Class (Points, Rebounds, Assists, etc.)
+
+```{r}
+# Calculating averages for multiple statistics grouped by draft class
+averages_per_class <- bball_data_specific %>%
+  group_by(DraftYr) %>%
+  summarize(
+    avg_ppg = mean(PPG, na.rm = TRUE),
+    avg_rpg = mean(RPG, na.rm = TRUE),
+    avg_apg = mean(APG, na.rm = TRUE),
+    avg_vorp = mean(VORP, na.rm = TRUE),
+    avg_bpm = mean(BPM, na.rm = TRUE),
+    avg_ws_per_48 = mean(WS.48, na.rm = TRUE),
+    avg_fg_pct = mean(FG., na.rm = TRUE),
+    avg_ft_pct = mean(FT., na.rm = TRUE),
+    avg_3p_pct = mean(X3P., na.rm = TRUE),
+    avg_yrs_play = mean(Yrs, na.rm = TRUE)
+  )
+
+
+
+```
+
+## Graphing the Data
+
+```{r}
+averages_long <- averages_per_class %>%
+  pivot_longer(
+    cols = starts_with("avg_"), 
+    names_to = "Statistic",     
+    values_to = "Value"         
+  )
+
+
+ggplot(averages_long, aes(x = DraftYr, y = Value, color = Statistic)) +
+  geom_line(size = 0.8) +    
+  geom_point(size = 3) +         
+  labs(
+    title = "NBA Draft Class Averages by Year",
+    x = "Draft Year",
+    y = "Average Value",
+    color = "Statistic"
+  )
+
+```
+
+```{r}
+averages_long <- averages_per_class %>%
+  pivot_longer(
+    cols = starts_with("avg_"),
+    names_to = "Statistic",
+    values_to = "Value"
+  ) %>%
+  mutate(
+    Category = case_when(
+      Statistic %in% c("avg_ppg", "avg_rpg", "avg_apg") ~ "Performance",
+      Statistic %in% c("avg_fg_pct", "avg_ft_pct", "avg_3p_pct") ~ "Efficiency",
+      Statistic %in% c("avg_vorp", "avg_bpm", "avg_ws_per_48") ~ "Advanced Metrics",
+      Statistic == "avg_yrs_play" ~ "Career Stats"
+    )
+  )
+
+ggplot(averages_long, aes(x = DraftYr, y = Value, color = Statistic)) +
+  geom_line(size = 0.7) +
+  geom_point(size = 2) +
+  facet_wrap(~Category, scales = "free_y") +  # Separate graphs for each category
+  labs(
+    title = "NBA Draft Class Averages by Category",
+    x = "Draft Year",
+    y = "Average Value",
+    color = "Statistic"
+  ) 
+```
+
+## NBA Awards Per Player
+
+```{r}
+bball_awards <- read.csv("/Users/jessekrinetz/Desktop/Data Science Notes/NBA-Awards.csv")
+
+```
+
+## MERGING THE STATS AND AWARDS DATA SETS
+
+```{r}
+
+bball_merged <- left_join(bball_data_specific, bball_awards, by = "Player")
+
+```
+
+## Total Awards for Each Draft Class
+
+```{r}
+award_summary <- bball_merged %>%
+  group_by(Draft.Year) %>%
+  summarize(
+    Total_All_Stars = sum(All.Star.Selections, na.rm = TRUE),
+    Total_All_NBA = sum(All.NBA.Teams, na.rm = TRUE),
+    Total_DPOY = sum(DPOY, na.rm = TRUE),
+    Total_Championships = sum(Championships, na.rm = TRUE),
+    Total_MVP = sum(MVP, na.rm = TRUE),
+    Total_FMVP = sum(FINALS.MVP, na.rm = TRUE)
+  ) %>%
+  pivot_longer(
+    cols = -Draft.Year, 
+    names_to = "Award", 
+    values_to = "Count"
+  )
+
+award_summary
+
+
+# Look at Highest to Lowest for Each Category
+# ALl Star
+highest_all_star <- award_summary %>%
+  filter(Award == "Total_All_Stars") %>%
+  arrange(desc(Count))
+
+view(highest_all_star)
+
+
+#All NBA
+highest_all_nba <- award_summary %>%
+  filter(Award == "Total_All_NBA") %>%
+  arrange(desc(Count))
+
+view(highest_all_nba)
+
+#DPOY
+highest_DPOY <- award_summary %>%
+  filter(Award == "Total_DPOY") %>%
+  arrange(desc(Count))
+
+view(highest_DPOY)
+
+#Championships
+highest_championships <- award_summary %>%
+  filter(Award == "Total_Championships") %>%
+  arrange(desc(Count))
+
+view(highest_championships)
+
+
+#MVP
+highest_MVPs <- award_summary %>%
+  filter(Award == "Total_MVP") %>%
+  arrange(desc(Count))
+
+view(highest_MVPs)
+
+#FMVP
+highest_FMVP <- award_summary %>%
+  filter(Award == "Total_FMVP") %>%
+  arrange(desc(Count))
+
+view(highest_FMVP)
+
+```
+
+## Graph for Draft Class Awards
+
+```{r}
+
+ggplot(award_summary, aes(x = Draft.Year, y = Count, fill = Award)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Total Awards by Draft Year",
+    x = "Draft Year",
+    y = "Total Count",
+    fill = "Award Type"
+  ) 
+
+```
+
+```{r}
+ggplot(highest_all_star, aes(x = as.factor(Draft.Year), y = Count, fill = Award)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Total All-Stars by Draft Year",
+    x = "Draft Year",
+    y = "Total Count",
+    fill = "Award Type"
+  ) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = FALSE)) +
+  theme(
+    axis.text.x = element_text(angle = 45)  
+  )
+
+
+```
+
+```{r}
+ggplot(highest_all_nba, aes(x = as.factor(Draft.Year), y = Count, fill = Award)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Total All-NBA by Draft Year",
+    x = "Draft Year",
+    y = "Total Count",
+    fill = "Award Type"
+  ) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = FALSE)) +
+  theme(
+    axis.text.x = element_text(angle = 45)  
+  )
+
+
+```
+
+```{r}
+ggplot(highest_DPOY, aes(x = as.factor(Draft.Year), y = Count, fill = Award)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Total DPOY by Draft Year",
+    x = "Draft Year",
+    y = "Total Count",
+    fill = "Award Type"
+  ) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = FALSE)) +
+  theme(
+    axis.text.x = element_text(angle = 45)  
+  )
+
+```
+
+```{r}
+ggplot(highest_championships, aes(x = as.factor(Draft.Year), y = Count, fill = Award)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Total Championships by Draft Year",
+    x = "Draft Year",
+    y = "Total Count",
+    fill = "Award Type"
+  ) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = FALSE)) +
+  theme(
+    axis.text.x = element_text(angle = 45)  
+  )
+
+```
+
+```{r}
+ggplot(highest_MVPs, aes(x = as.factor(Draft.Year), y = Count, fill = Award)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Total MVPs by Draft Year",
+    x = "Draft Year",
+    y = "Total Count",
+    fill = "Award Type"
+  ) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = FALSE)) +
+  theme(
+    axis.text.x = element_text(angle = 45)  
+  )
+
+```
+
+```{r}
+ggplot(highest_FMVP, aes(x = as.factor(Draft.Year), y = Count, fill = Award)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Total FMVPs by Draft Year",
+    x = "Draft Year",
+    y = "Total Count",
+    fill = "Award Type"
+  ) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = FALSE)) +
+  theme(
+    axis.text.x = element_text(angle = 45)  
+  )
+
+
+
+```
+
+```{r}
+
+all_draft_years <- data.frame(Draft.Year = seq(min(averages_per_class$DraftYr), max(averages_per_class$DraftYr), by = 1))
+
+combined_data <- averages_per_class %>%
+  rename(Draft.Year = DraftYr) %>%
+  left_join(
+    award_summary %>% # combines the statistical averages with the total awards 
+      pivot_wider(names_from = Award, values_from = Count), # makes the columns more organized and grouped together 
+    by = "Draft.Year"
+  )
+
+top_5_counts <- combined_data %>%
+  select(Draft.Year, avg_ppg:avg_yrs_play, Total_All_Stars:Total_FMVP) %>%
+  pivot_longer( #long format instead of wide format 
+    cols = -Draft.Year,
+    names_to = "Metric",
+    values_to = "Value"
+  ) %>%
+  group_by(Metric) %>%
+  mutate(Rank = rank(-Value, ties.method = "min")) %>%
+  filter(Rank <= 5) %>% # shows where the rank is in the top 5
+  group_by(Draft.Year) %>%
+  summarize(Top_5_Count = n())
+
+complete_top_5_counts <- all_draft_years %>%
+  left_join(top_5_counts, by = "Draft.Year") %>%
+  mutate(Top_5_Count = replace_na(Top_5_Count, 0))  # ensures every draft class is included 
+
+complete_top_5_counts <- complete_top_5_counts %>%
+  mutate(Draft.Year = fct_reorder(as.factor(Draft.Year), -Top_5_Count)) # reorders into desc order 
+
+ggplot(complete_top_5_counts, aes(x = Draft.Year, y = Top_5_Count, fill = Draft.Year)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Top 5 Rankings by Draft Class",
+    x = "Draft Year",
+    y = "Top 5 Appearances Across Metrics"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
+
+```
+
+```{r}
+ranked_data <- combined_data %>%
+  select(Draft.Year, avg_ppg:avg_yrs_play, Total_All_Stars:Total_FMVP) %>%
+  pivot_longer(
+    cols = -Draft.Year,
+    names_to = "Metric",
+    values_to = "Value"
+  ) %>%
+  group_by(Metric) %>%
+  mutate(Rank = rank(-Value, ties.method = "min")) %>%
+  filter(Rank <= 5) %>%
+  group_by(Draft.Year, Rank) %>%
+  summarize(Count = n(), .groups = "drop")
+
+all_combinations <- expand.grid(
+  Draft.Year = unique(combined_data$Draft.Year),
+  Rank = 1:5 #ensures every draft has a place for each rank even if its 0
+)
+
+ranked_data_complete <- all_combinations %>%
+  left_join(ranked_data, by = c("Draft.Year", "Rank")) %>%
+  mutate(Count = replace_na(Count, 0))  
+
+ranked_data_total <- ranked_data_complete %>%
+  group_by(Draft.Year) %>%
+  summarize(Total_Count = sum(Count)) %>%
+  arrange(desc(Total_Count))
+
+ranked_data_complete <- ranked_data_complete %>%
+  mutate(Draft.Year = factor(Draft.Year, levels = ranked_data_total$Draft.Year))
+
+
+ggplot(ranked_data_complete, aes(x = factor(Draft.Year), y = Count, fill = factor(Rank))) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(palette = "Set2", name = "Rank") +
+  labs(
+    title = "Top 5 Rankings by Draft Class",
+    x = "Draft Year",
+    y = "Number of Metrics in Top 5"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
